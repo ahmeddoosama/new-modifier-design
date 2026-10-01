@@ -1,0 +1,1039 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Modifier Group Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout concept: fixed step rail (left) + scrollable work surface with sticky top bar and fixed bottom action bar. Shopbox-matched: green accent, white cards on cool grey, collapsible card headers. */
+:root{
+  --accent:#17995e; --accent-ink:#0f7a4a; --accent-wash:#e4f5ec; --accent-wash-br:#bfe6d1;
+  --bg:#f3f5f7; --surface:#ffffff; --surface-2:#f8fafb; --rail:#ffffff;
+  --fg:#111a24; --muted:#5b6774; --faint:#8a95a1;
+  --border:#e5e9ee; --border-strong:#d3dae1; --field:#ffffff; --field-br:#d6dce3;
+  --danger:#e05640; --danger-wash:#fdecea; --warn:#c77d12; --info:#2f6fd6;
+  --shadow:0 1px 2px rgba(16,30,45,.06),0 1px 3px rgba(16,30,45,.05);
+  --shadow-lg:0 10px 30px rgba(16,30,45,.14),0 2px 8px rgba(16,30,45,.08);
+  --radius:12px; --radius-sm:9px;
+  --rail-g1:#3f8565; --rail-g2:#2f6a4e;
+  --f-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-sans);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px;color:var(--fg)}
+::selection{background:var(--accent-wash);color:var(--accent-ink)}
+
+/* ---------- App frame ---------- */
+.app{display:flex;flex-direction:column;height:100%;min-height:100%}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 20px;padding-top:calc(12px + env(safe-area-inset-top,0px));
+  background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:env(safe-area-inset-top,0px);z-index:30}
+.topbar .brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
+.topbar h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .sub{font-size:12px;color:var(--faint);white-space:nowrap}
+.topbar .spacer{flex:1}
+.iconbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);display:grid;place-items:center}
+.iconbtn:hover{background:var(--surface-2);color:var(--fg)}
+.theme-pill{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:20px;padding:5px 10px;background:var(--surface);color:var(--muted);font-size:12px;font-weight:500}
+.theme-pill:hover{color:var(--fg)}
+
+.body{flex:1;display:flex;min-height:0}
+
+/* ---------- Step rail ---------- */
+.rail{width:300px;flex:none;position:relative;overflow:hidden;color:#fff;padding:32px 26px 40px;
+  background:linear-gradient(168deg,var(--rail-g1) 0%,#377a5b 52%,var(--rail-g2) 100%)}
+.rail-logo{display:flex;align-items:center;gap:13px;margin-bottom:60px;position:relative;z-index:1}
+.rail-logo .mark{width:46px;height:46px;flex:none;border-radius:12px;background:#fff;color:#377a5b;display:grid;place-items:center;font-size:23px;font-weight:700}
+.rail-logo .wm{font-weight:700;font-size:17px;line-height:1.1}
+.rail-logo .wm small{display:block;font-weight:400;font-size:10.5px;opacity:.82;letter-spacing:.16em;text-transform:uppercase;margin-top:3px}
+.rail-wave{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.4}
+.rail-wave svg{position:absolute;inset:0;width:100%;height:100%}
+.steps{list-style:none;margin:0;padding:0;position:relative;z-index:1}
+.step{display:flex;flex-direction:column;align-items:stretch;gap:7px;padding:9px 12px;border-radius:13px;text-align:left;position:relative;width:100%;background:none;border:none;color:#fff;transition:background .15s}
+.step+.step{margin-top:26px}
+.step:hover:not(.is-active):not([disabled]){background:rgba(255,255,255,.08)}
+.step.is-active{background:rgba(255,255,255,.12)}
+.step[disabled]{opacity:.5;cursor:not-allowed}
+.step .row{display:flex;align-items:center;gap:14px}
+.step .dot{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;position:relative;
+  border:2px solid rgba(255,255,255,.55);background:transparent;color:#fff;transition:.18s;box-sizing:border-box}
+.step.is-active .dot{border-width:5px;border-color:#fff}
+.step.is-done .dot{background:#fff;border-color:#fff;color:#377a5b}
+.step:not(:last-child) .dot::after{content:"";position:absolute;top:40px;left:16px;transform:translateX(-50%);width:2px;height:50px;background:rgba(255,255,255,.4)}
+.step .k{font-size:13px;font-weight:500;opacity:.82}
+.step .t{font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.2;margin-left:46px;text-wrap:balance}
+.step .flag{display:inline-flex;align-items:center;gap:5px;margin-left:46px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.18);color:#fff;width:fit-content}
+.step .flag.todo{background:rgba(255,226,158,.24);color:#fff2d6}
+
+/* ---------- Work surface ---------- */
+.surface{flex:1;min-width:0;display:flex;flex-direction:column}
+.scroll{flex:1;overflow:auto;padding:26px 28px 120px}
+.wrap{max-width:860px;margin:0 auto}
+.page-head{margin-bottom:20px}
+.page-head .k{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--accent-ink)}
+.page-head h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:5px 0 4px;text-wrap:balance}
+.page-head p{margin:0;color:var(--muted);font-size:13.5px;max-width:62ch}
+
+/* ---------- Card ---------- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}
+.card-head{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);cursor:pointer}
+.card-head.plain{cursor:default}
+.card-head .ico{width:30px;height:30px;border-radius:8px;background:var(--accent-wash);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.card-head .ct{flex:1;min-width:0}
+.card-head h3{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.card-head .cd{margin:2px 0 0;font-size:12.5px;color:var(--muted);max-width:70ch}
+.card-head .chev{color:var(--faint);transition:transform .2s;flex:none;margin-top:3px}
+.card.collapsed .chev{transform:rotate(-90deg)}
+.card.collapsed .card-body{display:none}
+.card-body{padding:18px}
+
+/* ---------- Form ---------- */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field.full{grid-column:1/-1}
+.lab{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
+.lab .req{color:var(--danger)}
+.info{width:14px;height:14px;border-radius:50%;border:1.3px solid var(--faint);color:var(--faint);display:inline-grid;place-items:center;font-size:9px;font-style:italic;font-weight:700;cursor:help;flex:none}
+.inp{position:relative;display:flex;align-items:center}
+.inp input,.inp select,.field>input,.field>select{width:100%;padding:10px 12px;border:1px solid var(--field-br);border-radius:var(--radius-sm);background:var(--field);outline:none;transition:.15s;font-variant-numeric:tabular-nums}
+.inp select,.field>select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a95a1' stroke-width='2.2'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 11px center;padding-right:34px}
+.inp input:focus,.inp select:focus,.field>input:focus,.field>select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+.inp .suffix{position:absolute;right:12px;color:var(--faint);font-size:12px;pointer-events:none}
+.inp.has-suffix input{padding-right:62px}
+.field .help{font-size:11.5px;color:var(--faint)}
+.field.invalid input,.field.invalid select{border-color:var(--danger);box-shadow:0 0 0 3px var(--danger-wash)}
+.err{display:none;font-size:11.5px;color:var(--danger);font-weight:500}
+.field.invalid .err{display:block}
+.with-btn{display:flex;gap:8px}
+.with-btn input{flex:1}
+.ghost-g{border:1px solid var(--accent-wash-br);background:var(--accent-wash);color:var(--accent-ink);border-radius:var(--radius-sm);padding:0 14px;font-weight:600;font-size:12.5px;white-space:nowrap}
+.ghost-g:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* toggle row */
+.toggle-row{display:flex;align-items:center;gap:12px;padding:13px 15px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);margin:4px 0}
+.toggle-row .tt{flex:1;font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+.toggle-row .td{font-size:11.5px;color:var(--muted);font-weight:400;margin-top:1px}
+.sw{--w:40px;width:var(--w);height:23px;border-radius:20px;background:var(--border-strong);border:none;position:relative;flex:none;transition:.18s;padding:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:.18s}
+.sw.on{background:var(--accent)}
+.sw.on::after{left:calc(var(--w) - 21px)}
+.sw.sm{--w:36px;height:21px}
+.sw.sm::after{width:17px;height:17px}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:9px;font-weight:600;font-size:13.5px;border:1px solid transparent;transition:.15s;white-space:nowrap}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:var(--surface);border-color:var(--border-strong);color:var(--fg)}
+.btn.ghost:hover{background:var(--surface-2)}
+.btn.subtle{background:var(--accent-wash);color:var(--accent-ink);border-color:var(--accent-wash-br)}
+.btn.subtle:hover{background:var(--accent);color:#fff}
+.btn.danger-g{background:var(--surface);border-color:var(--border-strong);color:var(--danger)}
+.btn.danger-g:hover{background:var(--danger-wash)}
+.btn[disabled]{opacity:.5;cursor:not-allowed;filter:none!important}
+.btn.block{width:100%}
+.lnk{background:none;border:none;color:var(--accent-ink);font-weight:600;font-size:13px;padding:0}
+.lnk:hover{text-decoration:underline}
+
+/* ---------- Bottom action bar ---------- */
+.actionbar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);
+  padding:14px 28px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:12px;z-index:20}
+.actionbar .status{flex:1;font-size:12.5px;color:var(--muted);min-width:0;display:flex;align-items:center;gap:8px}
+.actionbar .status .pip{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+.actionbar .status.warn .pip{background:var(--warn)}
+
+/* ---------- Modifier table (Step 2) ---------- */
+.bar-actions{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.search{position:relative;flex:1;min-width:180px}
+.search input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--field-br);border-radius:9px;background:var(--field);outline:none}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint)}
+.seg{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.seg button{background:var(--surface);border:none;padding:8px 12px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button.on{background:var(--accent-wash);color:var(--accent-ink)}
+
+.tablewrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.thead{display:grid;grid-template-columns:var(--cols);gap:12px;padding:11px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);
+  font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.trow{display:grid;grid-template-columns:var(--cols);gap:12px;padding:12px 16px;align-items:center;border-bottom:1px solid var(--border);transition:background .12s}
+.trow:last-child{border-bottom:none}
+.trow:hover{background:var(--surface-2)}
+.trow.new{animation:flash 1.1s ease}
+@keyframes flash{0%{background:var(--accent-wash)}100%{background:transparent}}
+:root{--cols:46px 1.6fr .9fr 1fr .7fr .9fr 92px}
+.mImg{width:40px;height:40px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);display:grid;place-items:center;font-size:20px;flex:none}
+.mName{font-weight:600;font-size:13.5px;display:flex;flex-direction:column}
+.mName small{font-weight:400;color:var(--faint);font-size:11.5px}
+.price{font-variant-numeric:tabular-nums;font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);width:fit-content}
+.chip.cat{background:var(--accent-wash);border-color:var(--accent-wash-br);color:var(--accent-ink)}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;width:fit-content}
+.st::before{content:"";width:7px;height:7px;border-radius:50%}
+.st.active{color:var(--accent-ink)}.st.active::before{background:var(--accent)}
+.st.inactive{color:var(--faint)}.st.inactive::before{background:var(--faint)}
+.rowacts{display:flex;gap:4px;justify-content:flex-end}
+.ra{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted);display:grid;place-items:center}
+.ra:hover{background:var(--surface-2);color:var(--fg)}
+.ra.del:hover{color:var(--danger);border-color:var(--danger);background:var(--danger-wash)}
+
+/* quick add composer */
+.composer{display:grid;grid-template-columns:var(--cols);gap:12px;padding:12px 16px;align-items:center;background:var(--accent-wash);border-top:1px dashed var(--accent-wash-br)}
+.composer .emoji-pick{width:40px;height:40px;border-radius:9px;background:var(--surface);border:1px solid var(--border-strong);font-size:20px;display:grid;place-items:center}
+.composer input{padding:9px 11px;border:1px solid var(--field-br);border-radius:8px;background:var(--field);outline:none;width:100%}
+.composer input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(23,153,94,.18)}
+.composer .addbtn{grid-column:auto;display:flex;justify-content:flex-end}
+.composer .span2{grid-column:span 3}
+.composer-hint{font-size:11.5px;color:var(--muted);padding:8px 16px;background:var(--surface-2);border-top:1px solid var(--border);display:flex;align-items:center;gap:7px}
+kbd{font-family:var(--f-sans);font-size:10.5px;font-weight:600;background:var(--surface);border:1px solid var(--border-strong);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--muted)}
+
+.emptyrow{padding:40px 20px;text-align:center;color:var(--muted)}
+.emptyrow .big{font-size:30px;margin-bottom:8px}
+
+/* emoji popover */
+.pop{position:absolute;z-index:60;background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;display:grid;grid-template-columns:repeat(6,1fr);gap:3px;width:232px}
+.pop button{width:34px;height:34px;border-radius:8px;border:none;background:none;font-size:18px}
+.pop button:hover{background:var(--surface-2)}
+
+/* ---------- Drawer (advanced edit) ---------- */
+.scrim{position:fixed;inset:0;background:rgba(10,18,26,.5);opacity:0;pointer-events:none;transition:.2s;z-index:50;backdrop-filter:blur(1px)}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(520px,94vw);background:var(--surface);box-shadow:var(--shadow-lg);
+  transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:51;display:flex;flex-direction:column}
+.drawer.show{transform:none}
+.drawer-head{padding:18px 20px;padding-top:calc(18px + env(safe-area-inset-top,0px));border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px}
+.drawer-head .pv{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.drawer-head .pv .mImg{width:48px;height:48px;font-size:24px}
+.drawer-head .pn{font-weight:700;font-size:16px;letter-spacing:-.01em}
+.drawer-head .pp{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.drawer-body{flex:1;overflow:auto;padding:20px}
+.drawer-foot{padding:14px 20px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+.sect-head{display:flex;align-items:center;gap:10px;margin:22px 0 12px;cursor:pointer}
+.sect-head:first-child{margin-top:0}
+.sect-head .num{font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent-wash);border-radius:6px;padding:2px 7px;letter-spacing:.03em}
+.sect-head h4{margin:0;font-size:13.5px;font-weight:700;flex:1;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.sect-head .chev{color:var(--faint);transition:transform .2s}
+.sect.collapsed .chev{transform:rotate(-90deg)}
+.sect.collapsed .sect-body{display:none}
+
+/* emoji chooser strip in drawer */
+.emoji-strip{display:flex;gap:7px;flex-wrap:wrap}
+.emoji-strip button{width:40px;height:40px;border-radius:9px;border:1px solid var(--border);background:var(--surface);font-size:20px}
+.emoji-strip button.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash);background:var(--accent-wash)}
+
+/* availability chips */
+.choices{display:flex;gap:8px;flex-wrap:wrap}
+.choice{padding:8px 14px;border:1px solid var(--field-br);border-radius:9px;background:var(--field);font-size:12.5px;font-weight:600;color:var(--muted)}
+.choice.sel{border-color:var(--accent);background:var(--accent-wash);color:var(--accent-ink)}
+
+/* ---------- Step 3: variant groups ---------- */
+.multi{border:1px solid var(--field-br);border-radius:var(--radius-sm);background:var(--field);padding:7px 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;cursor:text;position:relative}
+.multi:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+.vchip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-wash);border:1px solid var(--accent-wash-br);color:var(--accent-ink);border-radius:7px;padding:4px 8px;font-size:12.5px;font-weight:600}
+.vchip button{background:none;border:none;color:var(--accent-ink);padding:0;display:grid;place-items:center;opacity:.7}
+.vchip button:hover{opacity:1}
+.multi .ph{color:var(--faint);padding:4px;font-size:13px}
+.multi .mchev{margin-left:auto;color:var(--faint)}
+.vgdrop{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;z-index:40}
+.vgdrop button{display:flex;width:100%;align-items:center;gap:10px;padding:9px 10px;border:none;background:none;border-radius:8px;font-size:13px;color:var(--fg);text-align:left}
+.vgdrop button:hover{background:var(--surface-2)}
+.vgdrop button .tick{margin-left:auto;color:var(--accent)}
+.vgdrop button[disabled]{opacity:.45;cursor:default}
+
+.vgcard{border:1px solid var(--border);border-radius:var(--radius);margin-top:14px;overflow:hidden}
+.vgcard-head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+.vgcard-head .vn{font-weight:700;font-size:14px;flex:1}
+.vgcard-head .cnt{font-size:11.5px;color:var(--muted);font-weight:500}
+.vgrid-head,.vgrow{display:grid;grid-template-columns:150px 1fr 1fr 1fr;gap:12px;align-items:center}
+.vgrid-head{padding:10px 16px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--border)}
+.vgrow{padding:11px 16px;border-bottom:1px solid var(--border)}
+.vgrow:last-child{border-bottom:none}
+.vgrow.off{opacity:.62}
+.vname{display:flex;align-items:center;gap:11px;font-weight:600;font-size:13.5px}
+.mini{display:flex;align-items:center;gap:0;position:relative}
+.mini input{width:100%;padding:8px 10px;border:1px solid var(--field-br);border-radius:8px;background:var(--field);outline:none;font-variant-numeric:tabular-nums;text-align:right;padding-right:42px}
+.mini input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash)}
+.mini input:disabled{background:var(--surface-2);color:var(--faint)}
+.mini .cur{position:absolute;right:11px;color:var(--faint);font-size:11.5px;pointer-events:none}
+.mini.ro input{background:var(--surface-2);color:var(--muted);border-style:dashed}
+.vgrow .na{grid-column:2/-1;font-size:12.5px;color:var(--faint);display:flex;align-items:center;gap:7px;font-style:italic}
+
+/* ---------- Step 3: product tree ---------- */
+.tree{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.tcat{border-bottom:1px solid var(--border)}
+.tcat:last-child{border-bottom:none}
+.tcat-head{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);cursor:pointer}
+.tcat-head:hover{background:var(--surface-2)}
+.tcat-head .exp{color:var(--faint);transition:transform .2s;flex:none}
+.tcat.open .tcat-head .exp{transform:rotate(90deg)}
+.tcat-head .cn{font-weight:600;font-size:13.5px;flex:1}
+.tcat-head .cmeta{font-size:11.5px;color:var(--muted);font-weight:500}
+.cbadge{font-size:10.5px;font-weight:700;background:var(--accent-wash);color:var(--accent-ink);border-radius:20px;padding:2px 9px;font-variant-numeric:tabular-nums}
+.cbadge.zero{background:var(--surface-2);color:var(--faint)}
+.tprods{display:none;background:var(--surface-2);padding:4px 0}
+.tcat.open .tprods{display:block}
+.tprod{display:flex;align-items:center;gap:12px;padding:9px 16px 9px 44px}
+.tprod:hover{background:var(--surface)}
+.tprod .pn2{flex:1;font-size:13px}
+.tprod .pc{font-size:11.5px;color:var(--faint)}
+.cbx{width:19px;height:19px;border-radius:6px;border:1.6px solid var(--border-strong);background:var(--field);display:grid;place-items:center;flex:none;color:#fff;transition:.12s;padding:0}
+.cbx.on{background:var(--accent);border-color:var(--accent)}
+.cbx.mixed{background:var(--accent);border-color:var(--accent)}
+.cbx svg{opacity:0}
+.cbx.on svg,.cbx.mixed svg{opacity:1}
+.treebar{display:flex;align-items:center;gap:10px;margin:14px 0 12px;flex-wrap:wrap}
+.treebar .n{font-size:12.5px;color:var(--muted);margin-left:auto}
+.treebar .n b{color:var(--accent-ink);font-variant-numeric:tabular-nums}
+.search-hit{background:rgba(227,166,18,.22);border-radius:3px}
+
+/* ---------- Review ---------- */
+.rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.rev-card{border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:var(--surface)}
+.rev-card h4{margin:0 0 12px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:8px}
+.rev-card h4 .edit{margin-left:auto;font-size:11px;color:var(--accent-ink);font-weight:600;cursor:pointer;text-transform:none;letter-spacing:0}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px;border-bottom:1px dashed var(--border)}
+.kv:last-child{border-bottom:none}
+.kv .k2{color:var(--muted)}
+.kv .v2{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.pill-list{display:flex;flex-wrap:wrap;gap:6px}
+.rev-mods{display:flex;flex-direction:column;gap:4px}
+.rev-mod{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:8px;background:var(--surface-2)}
+.rev-mod .mImg{width:30px;height:30px;font-size:16px;border-radius:7px}
+.rev-mod .nm{flex:1;font-size:13px;font-weight:600}
+.rev-mod .pr{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.done-wrap{text-align:center;padding:50px 20px}
+.done-ring{width:76px;height:76px;border-radius:50%;background:var(--accent-wash);display:grid;place-items:center;margin:0 auto 20px;color:var(--accent-ink);animation:pop .4s cubic-bezier(.2,1.3,.5,1)}
+@keyframes pop{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+.done-wrap h2{margin:0 0 8px;font-size:22px;letter-spacing:-.02em}
+.done-wrap p{margin:0 auto 24px;color:var(--muted);max-width:44ch}
+
+/* ---------- Toasts ---------- */
+.toasts{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:9px;align-items:center;width:max-content;max-width:92vw;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;background:var(--fg);color:var(--bg);padding:11px 15px;border-radius:10px;box-shadow:var(--shadow-lg);font-size:13px;font-weight:500;animation:slidein .25s ease}
+.toast .ti{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;flex:none}
+.toast.warn .ti{background:var(--warn)}
+.toast.info .ti{background:var(--info)}
+@keyframes slidein{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+@keyframes slideout{to{transform:translateY(8px);opacity:0}}
+
+/* mobile stepper */
+.mstep{display:none}
+@media (max-width:860px){
+  .rail{width:140px;padding:22px 13px 30px}
+  .rail-logo{margin-bottom:30px;gap:9px}
+  .rail-logo .mark{width:34px;height:34px;font-size:17px;border-radius:9px}
+  .rail-logo .wm{font-size:12.5px}
+  .rail-logo .wm small{display:none}
+  .step{gap:5px;padding:7px}
+  .step+.step{margin-top:20px}
+  .step .row{gap:11px}
+  .step .dot{width:26px;height:26px}
+  .step.is-active .dot{border-width:4px}
+  .step:not(:last-child) .dot::after{top:33px;left:13px;height:36px}
+  .step .k{font-size:10.5px}
+  .step .t{font-size:13px;margin-left:37px}
+  .step .flag{display:none}
+  .scroll{padding:18px 16px 120px}
+  .grid2{grid-template-columns:1fr}
+  .rev-grid{grid-template-columns:1fr}
+  :root{--cols:40px 1.4fr .8fr 78px}
+  .hide-sm{display:none!important}
+  .vgrid-head,.vgrow{grid-template-columns:110px 1fr 1fr}
+  .vg-hide{display:none!important}
+  .composer .span2{grid-column:span 1}
+  .actionbar{padding-left:16px;padding-right:16px}
+  .page-head h2{font-size:19px}
+}
+@media (max-width:520px){
+  .rail{display:none}
+  .mstep{display:flex;gap:7px;padding:12px 16px 0;background:var(--surface);overflow-x:auto}
+  .mstep .ms{flex:1;min-width:64px}
+  .mstep .ms .bar{height:5px;border-radius:4px;background:var(--border)}
+  .mstep .ms.done .bar,.mstep .ms.active .bar{background:var(--accent)}
+  .mstep .ms .lbl{font-size:10.5px;color:var(--faint);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mstep .ms.active .lbl{color:var(--accent-ink);font-weight:600}
+}
+@media (max-width:480px){
+  :root{--cols:40px 1fr 70px}
+  .col-cat,.col-vat,.col-st{display:none!important}
+}
+</style>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">S</div>
+      <div style="min-width:0">
+        <h1>Create Modifier group</h1>
+        <div class="sub">Shopbox · Back office</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <button class="iconbtn" title="Close" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <div class="body">
+    <nav class="rail">
+      <div class="rail-logo">
+        <div class="mark">S</div>
+        <div class="wm">Shopbox<small>Modifier groups</small></div>
+      </div>
+      <ul class="steps" id="steps"></ul>
+    </nav>
+
+    <section class="surface">
+      <div class="mstep" id="mstep"></div>
+      <div class="scroll"><div class="wrap" id="stepRoot"></div></div>
+      <div class="actionbar">
+        <div class="status" id="statusLine"><span class="pip"></span><span id="statusTxt">Ready</span></div>
+        <button class="btn ghost" id="backBtn">Back</button>
+        <button class="btn primary" id="nextBtn">Continue</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ================= State ================= */
+const CUR='DKK';
+const EMOJIS=['🧀','🍄','🐔','🫒','🌶️','🍅','🥓','🧅','🥑','🫑','🍍','🥩','🥬','🍗','🧄','🌽','🥚','🫘','🍋','🥒','🌭','🧈'];
+const CATS=['Vegetables','Dairy','Meat','Sauces','Spices','Bread','Other'];
+const VAT=['25%','15%','12%','0%'];
+
+const state={
+  step:0,
+  saved:false,
+  group:{name:'Vegetable toppings',price:'5',purchase:'0',takeaway:'5',category:'',
+    individual:true,taxDine:'25%',taxGo:'15%',sku:'SB-8214155',barcode:'012421000045521'},
+  modifiers:[
+    {id:1,emoji:'🧀',name:'Extra Cheese',official:'Extra Cheese',price:'5',takeaway:'3',cat:'Dairy',vat:'25%',vatGo:'15%',status:'Active',avail:'Always',purchase:'1',sku:'SB-8214156',barcode:''},
+    {id:2,emoji:'🍄',name:'Mushrooms',official:'Mushrooms',price:'4',takeaway:'3',cat:'Vegetables',vat:'25%',vatGo:'15%',status:'Active',avail:'Always',purchase:'1',sku:'SB-8214157',barcode:''},
+    {id:3,emoji:'🐔',name:'Chicken',official:'Grilled Chicken',price:'12',takeaway:'10',cat:'Meat',vat:'25%',vatGo:'15%',status:'Active',avail:'Always',purchase:'4',sku:'SB-8214158',barcode:''},
+    {id:4,emoji:'🫒',name:'Olives',official:'Olives',price:'3',takeaway:'3',cat:'Vegetables',vat:'25%',vatGo:'15%',status:'Active',avail:'Always',purchase:'1',sku:'SB-8214159',barcode:''},
+    {id:5,emoji:'🌶️',name:'Jalapeños',official:'Jalapeños',price:'3',takeaway:'3',cat:'Spices',vat:'15%',vatGo:'15%',status:'Inactive',avail:'Seasonal',purchase:'1',sku:'SB-8214160',barcode:''},
+  ],
+  modQuery:'',
+  variantGroups:{
+    'Pizza Size':{selected:true,variants:[{n:'Small',on:true,add:'0'},{n:'Medium',on:true,add:'5'},{n:'Large',on:true,add:'10'}]},
+    'Sandwich Size':{selected:true,variants:[{n:'Small',on:true,add:'0'},{n:'Medium',on:true,add:'0'},{n:'Large',on:false,add:'0'}]},
+    'Drink Size':{selected:false,variants:[{n:'Small',on:true,add:'0'},{n:'Medium',on:true,add:'3'},{n:'Large',on:true,add:'6'}]},
+    'Bread Type':{selected:false,variants:[{n:'White',on:true,add:'0'},{n:'Whole grain',on:true,add:'2'},{n:'Gluten-free',on:true,add:'5'}]},
+  },
+  vgDropOpen:false,
+  tree:[
+    {cat:'Pizza',open:true,prods:[
+      {n:'Margherita',on:true},{n:'Pepperoni',on:true},{n:'Chicken Pizza',on:true},
+      {n:'Vegetarian Pizza',on:false},{n:'Hawaiian',on:true},{n:'Four Cheese',on:true}]},
+    {cat:'Burgers',open:false,prods:[
+      {n:'Classic Burger',on:true},{n:'Cheeseburger',on:true},{n:'Chicken Burger',on:true},
+      {n:'Margherita Burger',on:true},{n:'Veggie Burger',on:false}]},
+    {cat:'Sides',open:false,prods:[
+      {n:'French Fries',on:true},{n:'Onion Rings',on:false},{n:'Garlic Bread',on:true},{n:'Mozzarella Sticks',on:true}]},
+    {cat:'Salads',open:false,prods:[
+      {n:'Caesar Salad',on:false},{n:'Greek Salad',on:true}]},
+  ],
+  prodQuery:'',
+  composer:{emoji:'🍅',name:'',price:''},
+};
+
+const STEPS=[
+  {t:'Main Information',d:'Group name, pricing & tax'},
+  {t:'Add Modifiers',d:'Build the modifier list'},
+  {t:'Variants & Products',d:'Scope & affected products'},
+  {t:'Review & Save',d:'Confirm and publish'},
+];
+let uid=100;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ================= Validation ================= */
+function step1Valid(){return state.group.name.trim()!=='' && state.group.price.trim()!=='';}
+function step2Valid(){return state.modifiers.length>0;}
+function stepStatus(i){
+  if(i===0)return step1Valid()?'ok':'todo';
+  if(i===1)return step2Valid()?'ok':'todo';
+  if(i===2)return selectedVGs().length>0?'ok':'todo';
+  return 'ok';
+}
+function selectedVGs(){return Object.keys(state.variantGroups).filter(k=>state.variantGroups[k].selected);}
+function affectedCount(){let n=0;state.tree.forEach(c=>c.prods.forEach(p=>{if(p.on)n++}));return n;}
+function catAffected(c){return c.prods.filter(p=>p.on).length;}
+
+/* ================= Toasts ================= */
+function toast(msg,kind){
+  const t=document.createElement('div');t.className='toast'+(kind?' '+kind:'');
+  const ic=kind==='warn'?'!':'✓';
+  t.innerHTML=`<span class="ti">${ic}</span><span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{t.style.animation='slideout .2s forwards';setTimeout(()=>t.remove(),200)},2200);
+}
+
+/* ================= Render: rail + stepper ================= */
+function renderRail(){
+  $('#steps').innerHTML=STEPS.map((s,i)=>{
+    const done=i<state.step;const active=i===state.step;
+    const st=stepStatus(i);
+    const disabled = i>state.step && !canReach(i);
+    const flag=(i<=2 && st==='todo' && !done)?`<span class="flag todo">Needs input</span>`:'';
+    return `<li><button class="step ${active?'is-active':''} ${done?'is-done':''}" ${disabled?'disabled':''} onclick="goStep(${i})">
+      <span class="row"><span class="dot">${done?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>':''}</span><span class="k">Step ${i+1}</span></span>
+      <span class="t">${s.t}</span>${flag}
+    </button></li>`;
+  }).join('');
+  $('#mstep').innerHTML=STEPS.map((s,i)=>`<div class="ms ${i<state.step?'done':''} ${i===state.step?'active':''}" onclick="${(i<=state.step||canReach(i))?`goStep(${i})`:''}">
+    <div class="bar"></div><div class="lbl">${i+1}. ${s.t}</div></div>`).join('');
+}
+function canReach(i){
+  if(i>=1 && !step1Valid())return false;
+  if(i>=2 && !step2Valid())return false;
+  return true;
+}
+
+/* ================= Navigation ================= */
+function goStep(i){
+  if(i>state.step && !canReach(i)){
+    if(!step1Valid()){state.step=0;render();flashInvalid();toast('Fill in the required fields first','warn');return;}
+    if(!step2Valid()){state.step=1;render();toast('Add at least one modifier','warn');return;}
+  }
+  state.step=i;state.saved=false;render();$('.scroll').scrollTop=0;
+}
+function next(){
+  if(state.step===0){
+    if(!step1Valid()){flashInvalid();toast('Please complete the required fields','warn');return;}
+  }
+  if(state.step===1 && !step2Valid()){toast('Add at least one modifier to continue','warn');return;}
+  if(state.step===3){doSave();return;}
+  state.step++;render();$('.scroll').scrollTop=0;
+}
+function back(){if(state.step>0){state.step--;state.saved=false;render();$('.scroll').scrollTop=0;}}
+function flashInvalid(){
+  ['g_name','g_price'].forEach(id=>{const f=document.getElementById(id);if(f&&!f.value.trim())f.closest('.field').classList.add('invalid');});
+}
+
+/* ================= Render dispatcher ================= */
+function render(){
+  renderRail();
+  const r=$('#stepRoot');
+  if(state.saved){r.innerHTML=renderDone();updateBar();return;}
+  if(state.step===0)r.innerHTML=renderStep1();
+  else if(state.step===1){r.innerHTML=renderStep2();afterStep2();}
+  else if(state.step===2){r.innerHTML=renderStep3();}
+  else r.innerHTML=renderStep4();
+  updateBar();
+}
+function updateBar(){
+  const back=$('#backBtn'),nx=$('#nextBtn'),sl=$('#statusLine'),stx=$('#statusTxt');
+  if(state.saved){back.style.display='none';nx.style.display='none';sl.innerHTML='<span class="pip"></span>Saved';return;}
+  back.style.display=state.step===0?'none':'';
+  nx.textContent=state.step===3?'Save Modifier group':'Continue';
+  nx.classList.toggle('primary',true);
+  // status text
+  let txt='',warn=false;
+  if(state.step===0){txt=step1Valid()?'Group details complete':'Group name and price are required';warn=!step1Valid();}
+  else if(state.step===1){txt=`${state.modifiers.length} modifier${state.modifiers.length!==1?'s':''} in this group`;}
+  else if(state.step===2){txt=`${selectedVGs().length} variant group${selectedVGs().length!==1?'s':''} · ${affectedCount()} products affected`;}
+  else{txt='Review everything, then save';}
+  stx.textContent=txt;sl.classList.toggle('warn',warn);
+}
+
+/* ================= STEP 1 ================= */
+function fieldGroupInput(id,key,val,opts={}){
+  return `<input id="${id}" value="${esc(val)}" placeholder="${opts.ph||''}" oninput="setG('${key}',this.value)" ${opts.type?`type="${opts.type}"`:''}>`;
+}
+function renderStep1(){
+  const g=state.group;
+  return `
+  <div class="page-head">
+    <div class="k">Step 1 of 4</div>
+    <h2>Main Information</h2>
+    <p>Essential details for the Modifier group — its name, default pricing, tax groups and inventory codes. These apply to every modifier unless you override them.</p>
+  </div>
+  <div class="card" id="card-general">
+    <div class="card-head" onclick="toggleCard('card-general')">
+      <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+      <div class="ct"><h3>General</h3><p class="cd">Manage essential Modifier group details like pricing, tax, inventory and connected variant groups.</p></div>
+      <span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+    </div>
+    <div class="card-body">
+      <div class="grid2">
+        <div class="field full ${!g.name.trim()?'':''}" id="field-name">
+          <label class="lab">Modifier group name <span class="req">*</span></label>
+          ${fieldGroupInput('g_name','name',g.name,{ph:'e.g. Vegetable toppings'})}
+          <span class="help">Displayed on cash register only</span>
+          <span class="err">Group name is required</span>
+        </div>
+        <div class="field">
+          <label class="lab">Price <span class="req">*</span> <span class="info" title="Default price incl. VAT applied to each modifier">i</span></label>
+          <div class="inp has-suffix"><input id="g_price" value="${esc(g.price)}" inputmode="decimal" oninput="setG('price',this.value)"><span class="suffix">incl. VAT</span></div>
+          <span class="err">Price is required</span>
+        </div>
+        <div class="field">
+          <label class="lab">Purchase price <span class="info" title="Cost price excl. VAT, for margin reporting">i</span></label>
+          <div class="inp has-suffix"><input value="${esc(g.purchase)}" inputmode="decimal" oninput="setG('purchase',this.value)"><span class="suffix">excl. VAT</span></div>
+        </div>
+        <div class="field">
+          <label class="lab">Take away price <span class="info" title="Price used for to-go orders">i</span></label>
+          <div class="inp has-suffix"><input value="${esc(g.takeaway)}" inputmode="decimal" oninput="setG('takeaway',this.value)"><span class="suffix">incl. VAT</span></div>
+        </div>
+        <div class="field">
+          <label class="lab">Category <span class="info" title="For standalone sales of modifiers">i</span></label>
+          <select onchange="setG('category',this.value)">
+            <option value="">Select category…</option>
+            ${CATS.map(c=>`<option ${g.category===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field full">
+          <div class="toggle-row">
+            <div class="tt">Set individual prices for each modifier <span class="info" title="When on, each modifier keeps its own price instead of inheriting the group price">i</span>
+              <div class="td">${g.individual?'Each modifier keeps its own price.':'All modifiers inherit the group price above.'}</div>
+            </div>
+            <button class="sw ${g.individual?'on':''}" onclick="setG('individual',${!g.individual})" aria-label="Individual prices"></button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="lab">Tax group — Dine in <span class="info" title="VAT rate applied for dine-in">i</span></label>
+          <select onchange="setG('taxDine',this.value)">${VAT.map(v=>`<option ${g.taxDine===v?'selected':''}>${v}</option>`).join('')}</select>
+        </div>
+        <div class="field">
+          <label class="lab">Tax group — To Go <span class="info" title="VAT rate applied for takeaway">i</span></label>
+          <select onchange="setG('taxGo',this.value)">${VAT.map(v=>`<option ${g.taxGo===v?'selected':''}>${v}</option>`).join('')}</select>
+        </div>
+        <div class="field">
+          <label class="lab">SKU code <span class="info" title="Stock keeping unit">i</span></label>
+          <div class="with-btn"><input value="${esc(g.sku)}" oninput="setG('sku',this.value)"><button class="ghost-g" onclick="genCode('sku')">New SKU code</button></div>
+        </div>
+        <div class="field">
+          <label class="lab">Bar code <span class="info" title="EAN / barcode number">i</span></label>
+          <div class="with-btn"><input value="${esc(g.barcode)}" oninput="setG('barcode',this.value)"><button class="ghost-g" onclick="genCode('barcode')">New bar code</button></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function setG(k,v){
+  state.group[k]=v;
+  const f=document.getElementById('field-name');
+  if(k==='name'){const el=$('#g_name');if(el&&el.value.trim())el.closest('.field').classList.remove('invalid');}
+  if(k==='price'){const el=$('#g_price');if(el&&el.value.trim())el.closest('.field').classList.remove('invalid');}
+  if(k==='individual'){render();}
+  else updateBar();
+  renderRail();
+}
+function genCode(which){
+  const v=which==='sku'?'SB-'+Math.floor(1000000+Math.random()*8999999):String(Math.floor(1e11+Math.random()*8e11));
+  state.group[which]=v;render();toast(which==='sku'?'New SKU code generated':'New bar code generated','info');
+}
+function toggleCard(id){document.getElementById(id).classList.toggle('collapsed');}
+
+/* ================= STEP 2 ================= */
+function renderStep2(){
+  const q=state.modQuery.toLowerCase();
+  const list=state.modifiers.filter(m=>m.name.toLowerCase().includes(q)||m.cat.toLowerCase().includes(q));
+  const rows=list.length?list.map(m=>modRow(m)).join(''):`<div class="emptyrow"><div class="big">🍽️</div><div><b>No modifiers match “${esc(state.modQuery)}”.</b></div></div>`;
+  return `
+  <div class="page-head">
+    <div class="k">Step 2 of 4</div>
+    <h2>Add Modifiers</h2>
+    <p>Add the individual options for this group. Type a name and price in the green row and press Enter to add it instantly — open <b>Edit</b> on any row for the full configuration.</p>
+  </div>
+  <div class="bar-actions">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.5-3.5"/></svg>
+      <input placeholder="Search modifiers…" value="${esc(state.modQuery)}" oninput="state.modQuery=this.value;rerenderTable()">
+    </div>
+    <button class="btn subtle" onclick="focusComposer()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg> Add Modifier
+    </button>
+  </div>
+  <div class="tablewrap" id="tablewrap">
+    <div class="thead">
+      <span></span><span>Modifier</span><span class="col-price">Price</span>
+      <span class="col-cat">Category</span><span class="col-vat">VAT</span><span class="col-st">Status</span><span style="text-align:right">Actions</span>
+    </div>
+    ${composerRow()}
+    <div class="composer-hint"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+      Press <kbd>Enter</kbd> to add and start the next one · <kbd>Tab</kbd> moves between fields. Advanced settings live behind <b>Edit</b>.</div>
+    <div id="rowsHost">${rows}</div>
+  </div>`;
+}
+function modRow(m){
+  return `<div class="trow" data-id="${m.id}">
+    <div class="mImg">${m.emoji}</div>
+    <div class="mName">${esc(m.name)}<small>${esc(m.official&&m.official!==m.name?m.official:'Displayed on register')}</small></div>
+    <div class="price col-price">${fmt(m.price)}</div>
+    <div class="col-cat"><span class="chip cat">${esc(m.cat||'—')}</span></div>
+    <div class="col-vat"><span class="chip">${esc(m.vat)}</span></div>
+    <div class="col-st"><span class="st ${m.status==='Active'?'active':'inactive'}">${m.status}</span></div>
+    <div class="rowacts">
+      <button class="ra" title="Edit" onclick="openDrawer(${m.id})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+      <button class="ra del" title="Delete" onclick="delMod(${m.id})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+    </div>
+  </div>`;
+}
+function composerRow(){
+  const c=state.composer;
+  return `<div class="composer" id="composer">
+    <button class="emoji-pick" id="emojiPick" onclick="toggleEmojiPop(event)">${c.emoji}</button>
+    <input id="c_name" class="span2" placeholder="Modifier name (e.g. Bacon)" value="${esc(c.name)}"
+      oninput="state.composer.name=this.value" onkeydown="composerKey(event)">
+    <input id="c_price" class="col-price" placeholder="Price" inputmode="decimal" value="${esc(c.price)}"
+      oninput="state.composer.price=this.value" onkeydown="composerKey(event)" style="text-align:right">
+    <span class="col-cat hide-sm"></span><span class="col-vat hide-sm"></span><span class="col-st hide-sm"></span>
+    <div class="rowacts"><button class="btn primary" style="padding:8px 14px" onclick="addComposer()">Add</button></div>
+  </div>`;
+}
+function fmt(v){const n=parseFloat(v);return (isNaN(n)?'0':(n%1?n.toFixed(2):n))+' '+CUR;}
+function afterStep2(){/* placeholder for focus restore */}
+function rerenderTable(){
+  const host=$('#rowsHost');if(!host)return;
+  const q=state.modQuery.toLowerCase();
+  const list=state.modifiers.filter(m=>m.name.toLowerCase().includes(q)||m.cat.toLowerCase().includes(q));
+  host.innerHTML=list.length?list.map(m=>modRow(m)).join(''):`<div class="emptyrow"><div class="big">🍽️</div><div><b>No modifiers match “${esc(state.modQuery)}”.</b></div></div>`;
+  updateBar();renderRail();
+}
+function focusComposer(){const el=$('#c_name');if(el){el.focus();el.scrollIntoView({block:'center',behavior:'smooth'});}}
+function composerKey(e){if(e.key==='Enter'){e.preventDefault();addComposer();}}
+function addComposer(){
+  const c=state.composer;
+  if(!c.name.trim()){toast('Enter a modifier name','warn');$('#c_name').focus();return;}
+  const price=c.price.trim()||state.group.price||'0';
+  const m={id:++uid,emoji:c.emoji,name:c.name.trim(),official:c.name.trim(),price:price,takeaway:price,
+    cat:state.group.category||'Other',vat:state.group.taxDine,vatGo:state.group.taxGo,status:'Active',avail:'Always',purchase:'0',sku:'',barcode:''};
+  state.modifiers.unshift(m);
+  // reset composer, keep a fresh emoji
+  state.composer={emoji:EMOJIS[(EMOJIS.indexOf(c.emoji)+1)%EMOJIS.length],name:'',price:''};
+  rerenderTable();
+  // re-render composer
+  const comp=$('#composer');if(comp)comp.outerHTML=composerRow();
+  // flash the new row
+  const nr=document.querySelector(`.trow[data-id="${m.id}"]`);if(nr)nr.classList.add('new');
+  toast('Added “'+m.name+'”');
+  setTimeout(()=>{const el=$('#c_name');if(el)el.focus();},30);
+}
+function delMod(id){
+  const m=state.modifiers.find(x=>x.id===id);
+  state.modifiers=state.modifiers.filter(x=>x.id!==id);
+  rerenderTable();toast('Removed “'+(m?m.name:'modifier')+'”','warn');
+}
+/* emoji popover */
+let popEl=null;
+function toggleEmojiPop(e){
+  e.stopPropagation();
+  if(popEl){popEl.remove();popEl=null;return;}
+  popEl=document.createElement('div');popEl.className='pop';
+  popEl.innerHTML=EMOJIS.map(em=>`<button onclick="pickComposerEmoji('${em}')">${em}</button>`).join('');
+  document.body.appendChild(popEl);
+  const r=e.currentTarget.getBoundingClientRect();
+  popEl.style.top=(r.bottom+6+window.scrollY)+'px';popEl.style.left=(r.left+window.scrollX)+'px';
+}
+function pickComposerEmoji(em){state.composer.emoji=em;const b=$('#emojiPick');if(b)b.textContent=em;if(popEl){popEl.remove();popEl=null;}}
+document.addEventListener('click',()=>{if(popEl){popEl.remove();popEl=null;}});
+
+/* ================= Advanced edit drawer ================= */
+let editId=null,editDraft=null;
+function openDrawer(id){
+  const m=state.modifiers.find(x=>x.id===id);if(!m)return;
+  editId=id;editDraft=Object.assign({},m);
+  const d=$('#drawer');
+  d.innerHTML=drawerHTML(editDraft);
+  d.setAttribute('aria-hidden','false');
+  $('#scrim').classList.add('show');
+  requestAnimationFrame(()=>d.classList.add('show'));
+}
+function closeDrawer(){
+  const d=$('#drawer');d.classList.remove('show');$('#scrim').classList.remove('show');
+  d.setAttribute('aria-hidden','true');editId=null;editDraft=null;
+}
+function dSet(k,v){editDraft[k]=v;if(k==='name'||k==='price'||k==='emoji'){
+  const pn=$('#dw-pn'),pp=$('#dw-pp'),im=$('#dw-img');
+  if(pn)pn.textContent=editDraft.name||'Untitled modifier';
+  if(pp)pp.textContent=fmt(editDraft.price);
+  if(im&&k==='emoji')im.textContent=v;
+}}
+function drawerHTML(m){
+  return `
+  <div class="drawer-head">
+    <div class="pv">
+      <div class="mImg" id="dw-img">${m.emoji}</div>
+      <div><div class="pn" id="dw-pn">${esc(m.name)||'Untitled modifier'}</div><div class="pp" id="dw-pp">${fmt(m.price)}</div></div>
+    </div>
+    <button class="iconbtn" onclick="closeDrawer()" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="sect" id="sect-basic">
+      <div class="sect-head" onclick="toggleSect('sect-basic')"><span class="num">Basic</span><h4>Basic information</h4>
+        <span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+      <div class="sect-body">
+        <div class="field full" style="margin-bottom:14px">
+          <label class="lab">Image</label>
+          <div class="emoji-strip">${EMOJIS.slice(0,11).map(em=>`<button class="${m.emoji===em?'sel':''}" onclick="dSetEmoji('${em}',this)">${em}</button>`).join('')}</div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label class="lab">Modifier name <span class="req">*</span></label>
+            <input value="${esc(m.name)}" oninput="dSet('name',this.value)"><span class="help">Displayed on cash register</span></div>
+          <div class="field"><label class="lab">Official name <span class="info" title="Shown on printed receipts and reports">i</span></label>
+            <input value="${esc(m.official||'')}" oninput="dSet('official',this.value)"><span class="help">For printed receipts and reports</span></div>
+          <div class="field"><label class="lab">Price <span class="req">*</span></label>
+            <div class="inp has-suffix"><input value="${esc(m.price)}" inputmode="decimal" oninput="dSet('price',this.value)"><span class="suffix">incl. VAT</span></div></div>
+          <div class="field"><label class="lab">Take away price</label>
+            <div class="inp has-suffix"><input value="${esc(m.takeaway||'')}" inputmode="decimal" oninput="dSet('takeaway',this.value)"><span class="suffix">incl. VAT</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect" id="sect-adv">
+      <div class="sect-head" onclick="toggleSect('sect-adv')"><span class="num">Advanced</span><h4>Advanced configuration</h4>
+        <span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+      <div class="sect-body">
+        <div class="grid2">
+          <div class="field"><label class="lab">Category <span class="req">*</span></label>
+            <select onchange="dSet('cat',this.value)">${CATS.map(c=>`<option ${m.cat===c?'selected':''}>${c}</option>`).join('')}</select>
+            <span class="help">For sales independent of products</span></div>
+          <div class="field"><label class="lab">Purchase price</label>
+            <div class="inp has-suffix"><input value="${esc(m.purchase||'')}" inputmode="decimal" oninput="dSet('purchase',this.value)"><span class="suffix">excl. VAT</span></div></div>
+          <div class="field"><label class="lab">VAT group — Dine in</label>
+            <select onchange="dSet('vat',this.value)">${VAT.map(v=>`<option ${m.vat===v?'selected':''}>${v}</option>`).join('')}</select></div>
+          <div class="field"><label class="lab">VAT group — To Go</label>
+            <select onchange="dSet('vatGo',this.value)">${VAT.map(v=>`<option ${m.vatGo===v?'selected':''}>${v}</option>`).join('')}</select></div>
+        </div>
+        <div class="field full" style="margin-top:14px"><label class="lab">Availability</label>
+          <div class="choices">${['Always','Breakfast','Seasonal','Weekends'].map(a=>`<button class="choice ${m.avail===a?'sel':''}" onclick="dSetChoice('avail','${a}',this)">${a}</button>`).join('')}</div></div>
+        <div class="field full" style="margin-top:14px">
+          <div class="toggle-row"><div class="tt">Active on cash register<div class="td">Inactive modifiers stay saved but aren't shown to staff.</div></div>
+            <button class="sw ${m.status==='Active'?'on':''}" onclick="dToggleStatus(this)"></button></div></div>
+        <div class="grid2" style="margin-top:14px">
+          <div class="field"><label class="lab">SKU code</label>
+            <div class="with-btn"><input value="${esc(m.sku||'')}" oninput="dSet('sku',this.value)"><button class="ghost-g" onclick="dGen('sku')">New</button></div></div>
+          <div class="field"><label class="lab">Bar code</label>
+            <div class="with-btn"><input value="${esc(m.barcode||'')}" oninput="dSet('barcode',this.value)"><button class="ghost-g" onclick="dGen('barcode')">New</button></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn ghost" onclick="closeDrawer()">Cancel</button>
+    <button class="btn primary" onclick="saveDrawer()">Save changes</button>
+  </div>`;
+}
+function toggleSect(id){document.getElementById(id).classList.toggle('collapsed');}
+function dSetEmoji(em,btn){editDraft.emoji=em;dSet('emoji',em);btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
+function dSetChoice(k,v,btn){editDraft[k]=v;btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
+function dToggleStatus(btn){const on=!btn.classList.contains('on');btn.classList.toggle('on',on);editDraft.status=on?'Active':'Inactive';}
+function dGen(which){const v=which==='sku'?'SB-'+Math.floor(1000000+Math.random()*8999999):String(Math.floor(1e11+Math.random()*8e11));editDraft[which]=v;const d=$('#drawer');d.innerHTML=drawerHTML(editDraft);}
+function saveDrawer(){
+  if(!editDraft.name.trim()){toast('Modifier name is required','warn');return;}
+  const i=state.modifiers.findIndex(x=>x.id===editId);
+  if(i>-1)state.modifiers[i]=Object.assign({},editDraft);
+  const nm=editDraft.name;closeDrawer();rerenderTable();toast('Updated “'+nm+'”');
+}
+
+/* ================= STEP 3 ================= */
+function renderStep3(){
+  return `
+  <div class="page-head">
+    <div class="k">Step 3 of 4</div>
+    <h2>Variant groups &amp; affected products</h2>
+    <p>Decide which product variants this group applies to and fine-tune where it takes effect across your menu.</p>
+  </div>
+  ${vgCard()}
+  ${productCard()}`;
+}
+function vgCard(){
+  const sel=selectedVGs();
+  return `<div class="card" id="card-vg">
+    <div class="card-head" onclick="toggleCard('card-vg')">
+      <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 7 6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/></svg></span>
+      <div class="ct"><h3>Connect to Variant groups</h3><p class="cd">Connect Modifier groups to specific Variant groups for more flexibility and control over product modifications and pricing.</p></div>
+      <span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+    </div>
+    <div class="card-body">
+      <div class="field full" style="position:relative">
+        <label class="lab">Connect to Variant groups <span class="info" title="Select one or more variant groups">i</span></label>
+        <div class="multi" onclick="toggleVgDrop(event)">
+          ${sel.length?sel.map(k=>`<span class="vchip">${esc(k)}<button onclick="removeVG(event,'${esc(k)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>`).join(''):'<span class="ph">Select variant groups…</span>'}
+          <span class="mchev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+          ${state.vgDropOpen?vgDropdown():''}
+        </div>
+      </div>
+      <div id="vgCards">${sel.map(k=>vgDetail(k)).join('')||'<div class="emptyrow" style="padding:26px"><div class="big">🧩</div>Select a variant group above to configure its pricing.</div>'}</div>
+    </div>
+  </div>`;
+}
+function vgDropdown(){
+  return `<div class="vgdrop" onclick="event.stopPropagation()">
+    ${Object.keys(state.variantGroups).map(k=>{const v=state.variantGroups[k];
+      return `<button onclick="toggleVG('${esc(k)}')"><span>${esc(k)}</span><span style="color:var(--faint);font-size:11.5px">${v.variants.length} variants</span>${v.selected?'<span class="tick"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>':''}</button>`;
+    }).join('')}
+  </div>`;
+}
+function toggleVgDrop(e){e.stopPropagation();state.vgDropOpen=!state.vgDropOpen;refreshVG();}
+function toggleVG(k){state.variantGroups[k].selected=!state.variantGroups[k].selected;refreshVG();
+  toast(state.variantGroups[k].selected?'Connected “'+k+'”':'Disconnected “'+k+'”',state.variantGroups[k].selected?null:'warn');}
+function removeVG(e,k){e.stopPropagation();state.variantGroups[k].selected=false;refreshVG();toast('Disconnected “'+k+'”','warn');}
+function refreshVG(){const c=$('#card-vg');if(c){const open=!c.classList.contains('collapsed');const host=document.createElement('div');host.innerHTML=vgCard();const nc=host.firstElementChild;if(!open)nc.classList.add('collapsed');c.replaceWith(nc);}updateBar();renderRail();}
+function vgDetail(k){
+  const v=state.variantGroups[k];const onCount=v.variants.filter(x=>x.on).length;
+  return `<div class="vgcard">
+    <div class="vgcard-head"><span class="vn">${esc(k)}</span><span class="cnt">${onCount}/${v.variants.length} variants enabled</span>
+      <button class="ra del" title="Remove" onclick="toggleVG('${esc(k)}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></div>
+    <div class="vgrid-head"><span>Variant</span><span style="text-align:right">Add-on price</span><span style="text-align:right" class="vg-hide">Final price</span><span style="text-align:right" class="vg-hide">Takeaway</span></div>
+    ${v.variants.map((x,i)=>vgRow(k,i,x)).join('')}
+  </div>`;
+}
+function vgRow(k,i,x){
+  const base=parseFloat(state.group.price)||0;const baseT=parseFloat(state.group.takeaway)||0;const add=parseFloat(x.add)||0;
+  const fin=base+add,finT=baseT+add;
+  if(!x.on){
+    return `<div class="vgrow off">
+      <div class="vname"><button class="sw sm" onclick="vgToggle('${esc(k)}',${i})" aria-label="Enable"></button>${esc(x.n)}</div>
+      <div class="na" ><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> Not available for this variant</div>
+    </div>`;
+  }
+  return `<div class="vgrow">
+    <div class="vname"><button class="sw sm on" onclick="vgToggle('${esc(k)}',${i})" aria-label="Disable"></button>${esc(x.n)}</div>
+    <div class="mini"><input value="${esc(x.add)}" inputmode="decimal" oninput="vgAdd('${esc(k)}',${i},this.value)" style="text-align:right"><span class="cur">+${CUR}</span></div>
+    <div class="mini ro vg-hide"><input value="${fmt2(fin)}" disabled><span class="cur">${CUR}</span></div>
+    <div class="mini ro vg-hide"><input value="${fmt2(finT)}" disabled><span class="cur">${CUR}</span></div>
+  </div>`;
+}
+function fmt2(n){return (n%1?n.toFixed(2):n)+'';}
+function vgToggle(k,i){const x=state.variantGroups[k].variants[i];x.on=!x.on;refreshVGCards();}
+function vgAdd(k,i,val){state.variantGroups[k].variants[i].add=val;
+  // live update computed fields in that card without full re-render
+  refreshVGCards(true);}
+let vgAddTimer=null;
+function refreshVGCards(soft){
+  const host=$('#vgCards');if(!host)return;
+  host.innerHTML=selectedVGs().map(k=>vgDetail(k)).join('')||'<div class="emptyrow" style="padding:26px"><div class="big">🧩</div>Select a variant group above to configure its pricing.</div>';
+}
+
+/* --- product tree --- */
+function productCard(){
+  return `<div class="card" id="card-prod">
+    <div class="card-head" onclick="toggleCard('card-prod')">
+      <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9h18M9 21V9"/><rect x="3" y="4" width="18" height="17" rx="2"/></svg></span>
+      <div class="ct"><h3>Affected Product categories &amp; Products</h3><p class="cd">See what products and categories are affected by the changes above, and customise the effect on each of them.</p></div>
+      <span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+    </div>
+    <div class="card-body">
+      <div class="bar-actions" style="margin-bottom:0">
+        <div class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.5-3.5"/></svg>
+          <input placeholder="Search products across all categories…" value="${esc(state.prodQuery)}" oninput="state.prodQuery=this.value;refreshTree()">
+        </div>
+      </div>
+      <div class="treebar">
+        <button class="btn ghost" style="padding:7px 12px" onclick="bulkTree(true)">Enable all</button>
+        <button class="btn ghost" style="padding:7px 12px" onclick="bulkTree(false)">Disable all</button>
+        <button class="btn ghost" style="padding:7px 12px" onclick="toggleAllCats()">Expand / collapse</button>
+        <span class="n"><b id="affCount">${affectedCount()}</b> of ${totalProds()} products affected</span>
+      </div>
+      <div class="tree" id="tree">${treeHTML()}</div>
+    </div>
+  </div>`;
+}
+function totalProds(){return state.tree.reduce((a,c)=>a+c.prods.length,0);}
+function treeHTML(){
+  const q=state.prodQuery.toLowerCase();
+  return state.tree.map((c,ci)=>{
+    const matchProds=c.prods.filter(p=>!q||p.n.toLowerCase().includes(q));
+    if(q&&matchProds.length===0&&!c.cat.toLowerCase().includes(q))return '';
+    const on=catAffected(c);const total=c.prods.length;
+    const cls=on===0?'':(on===total?'on':'mixed');
+    const open=c.open||(q&&matchProds.length>0);
+    return `<div class="tcat ${open?'open':''}" data-ci="${ci}">
+      <div class="tcat-head">
+        <button class="cbx ${cls}" onclick="toggleCat(event,${ci})" aria-label="Toggle category">${cls==='on'?checkSvg():cls==='mixed'?dashSvg():''}</button>
+        <span class="exp" onclick="toggleCatOpen(${ci})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+        <span class="cn" onclick="toggleCatOpen(${ci})">${hl(c.cat,q)}</span>
+        <span class="cmeta">${total} products</span>
+        <span class="cbadge ${on===0?'zero':''}">${on} affected</span>
+      </div>
+      <div class="tprods">
+        ${(q?matchProds:c.prods).map(p=>{const pi=c.prods.indexOf(p);return `<div class="tprod">
+          <button class="cbx ${p.on?'on':''}" onclick="toggleProd(${ci},${pi})" aria-label="Toggle">${p.on?checkSvg():''}</button>
+          <span class="pn2">${hl(p.n,q)}</span><span class="pc">${esc(c.cat)}</span>
+        </div>`;}).join('')}
+      </div>
+    </div>`;
+  }).join('')||'<div class="emptyrow"><div class="big">🔍</div>No products match your search.</div>';
+}
+function checkSvg(){return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>';}
+function dashSvg(){return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/></svg>';}
+function hl(txt,q){if(!q)return esc(txt);const i=txt.toLowerCase().indexOf(q);if(i<0)return esc(txt);
+  return esc(txt.slice(0,i))+'<span class="search-hit">'+esc(txt.slice(i,i+q.length))+'</span>'+esc(txt.slice(i+q.length));}
+function refreshTree(){const t=$('#tree');if(t)t.innerHTML=treeHTML();const a=$('#affCount');if(a)a.textContent=affectedCount();updateBar();}
+function toggleCatOpen(ci){state.tree[ci].open=!state.tree[ci].open;refreshTree();}
+function toggleCat(e,ci){e.stopPropagation();const c=state.tree[ci];const allOn=catAffected(c)===c.prods.length;c.prods.forEach(p=>p.on=!allOn);refreshTree();
+  toast((allOn?'Disabled ':'Enabled ')+'all in '+c.cat,allOn?'warn':null);}
+function toggleProd(ci,pi){const p=state.tree[ci].prods[pi];p.on=!p.on;refreshTree();}
+function bulkTree(on){state.tree.forEach(c=>c.prods.forEach(p=>p.on=on));refreshTree();toast(on?'All products enabled':'All products disabled',on?null:'warn');}
+function toggleAllCats(){const anyClosed=state.tree.some(c=>!c.open);state.tree.forEach(c=>c.open=anyClosed);refreshTree();}
+
+/* ================= STEP 4 review ================= */
+function renderStep4(){
+  const g=state.group;const sel=selectedVGs();
+  return `
+  <div class="page-head">
+    <div class="k">Step 4 of 4</div>
+    <h2>Review &amp; Save</h2>
+    <p>A quick summary of everything you configured. Jump back to any step to make changes, then save the Modifier group.</p>
+  </div>
+  <div class="rev-grid">
+    <div class="rev-card">
+      <h4>Group details <span class="edit" onclick="goStep(0)">Edit</span></h4>
+      <div class="kv"><span class="k2">Name</span><span class="v2">${esc(g.name||'—')}</span></div>
+      <div class="kv"><span class="k2">Price</span><span class="v2">${fmt(g.price)}</span></div>
+      <div class="kv"><span class="k2">Take away</span><span class="v2">${fmt(g.takeaway)}</span></div>
+      <div class="kv"><span class="k2">Category</span><span class="v2">${esc(g.category||'—')}</span></div>
+      <div class="kv"><span class="k2">Tax (Dine in / To Go)</span><span class="v2">${g.taxDine} / ${g.taxGo}</span></div>
+      <div class="kv"><span class="k2">Individual prices</span><span class="v2">${g.individual?'On':'Off'}</span></div>
+      <div class="kv"><span class="k2">SKU</span><span class="v2">${esc(g.sku||'—')}</span></div>
+    </div>
+    <div class="rev-card">
+      <h4>Scope <span class="edit" onclick="goStep(2)">Edit</span></h4>
+      <div class="kv"><span class="k2">Variant groups</span><span class="v2">${sel.length}</span></div>
+      <div style="margin:8px 0 12px" class="pill-list">${sel.length?sel.map(k=>`<span class="chip cat">${esc(k)}</span>`).join(''):'<span class="chip">None connected</span>'}</div>
+      <div class="kv"><span class="k2">Products affected</span><span class="v2">${affectedCount()} / ${totalProds()}</span></div>
+      <div style="margin-top:8px" class="pill-list">${state.tree.filter(c=>catAffected(c)>0).map(c=>`<span class="chip">${esc(c.cat)} · ${catAffected(c)}</span>`).join('')||'<span class="chip">No products</span>'}</div>
+    </div>
+  </div>
+  <div class="rev-card" style="margin-top:16px">
+    <h4>Modifiers · ${state.modifiers.length} <span class="edit" onclick="goStep(1)">Edit</span></h4>
+    <div class="rev-mods">
+      ${state.modifiers.map(m=>`<div class="rev-mod"><span class="mImg">${m.emoji}</span><span class="nm">${esc(m.name)}</span><span class="st ${m.status==='Active'?'active':'inactive'}" style="font-size:11px">${m.status}</span><span class="pr">${fmt(m.price)}</span></div>`).join('')||'<div class="emptyrow">No modifiers added.</div>'}
+    </div>
+  </div>`;
+}
+function renderDone(){
+  return `<div class="done-wrap">
+    <div class="done-ring"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <h2>“${esc(state.group.name)}” saved</h2>
+    <p>Your Modifier group is live with ${state.modifiers.length} modifier${state.modifiers.length!==1?'s':''}, connected to ${selectedVGs().length} variant group${selectedVGs().length!==1?'s':''} and affecting ${affectedCount()} products.</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="btn ghost" onclick="state.saved=false;goStep(0)">Create another</button>
+      <button class="btn primary" onclick="state.saved=false;goStep(3)">Back to review</button>
+    </div>
+  </div>`;
+}
+function doSave(){
+  state.saved=true;render();toast('Modifier group saved');
+  $('.scroll').scrollTop=0;
+}
+
+/* ================= wire up ================= */
+$('#backBtn').addEventListener('click',back);
+$('#nextBtn').addEventListener('click',next);
+
+render();
+</script>
+
+</body></html>
